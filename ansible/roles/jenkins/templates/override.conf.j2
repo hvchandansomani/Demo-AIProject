@@ -1,0 +1,9 @@
+# Written by Ansible (roles/jenkins).
+[Service]
+{% if jenkins_configure_as_code %}
+# No setup wizard: everything comes from Configuration as Code (casc.yaml).
+Environment="JAVA_OPTS=-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+Environment="CASC_JENKINS_CONFIG={{ jenkins_home }}/casc.yaml"
+{% else %}
+Environment="JAVA_OPTS=-Djava.awt.headless=true"
+{% endif %}

@@ -1,0 +1,38 @@
+---
+# Settings for every server. Server IPs, the region and the ECR registry come
+# from inventory/hosts.ini, which Terraform writes.
+
+project: marathon
+app_namespace: marathon
+
+# ------------------------------------------------------------------ versions
+# Pinned on purpose, so every run installs exactly the same thing.
+# Change them deliberately, then re-run and re-test.
+k3s_version: v1.34.11+k3s1
+kubectl_minor: "1.34"                    # kubectl on Jenkins, same minor as k3s
+argocd_version: v3.5.3
+jenkins_plugin_manager_version: "2.15.0"
+
+# ------------------------------------------------------------------ Jenkins
+# true: Jenkins starts fully configured (admin user, credentials, settings and
+# the pipeline job) with no setup wizard. false: plain install with the wizard.
+jenkins_configure_as_code: true
+
+jenkins_admin_user: admin
+# Never commit the password. Export it before running the playbook:
+#   export JENKINS_ADMIN_PASSWORD='a-long-random-password'
+jenkins_admin_password: "{{ lookup('ansible.builtin.env', 'JENKINS_ADMIN_PASSWORD') }}"
+
+# The Git repository Jenkins builds (your fork of this project).
+app_repo_url: "https://github.com/YOUR-GITHUB-USER/Demo-B17.git"
+app_repo_branch: main
+
+# Optional, for the GitOps (Argo CD) path: lets Jenkins push image-tag updates
+# back to the repo. Leave empty to add the credential by hand later.
+#   export GIT_PUSH_USER=your-github-user GIT_PUSH_TOKEN=github_pat_...
+git_push_user: "{{ lookup('ansible.builtin.env', 'GIT_PUSH_USER') }}"
+git_push_token: "{{ lookup('ansible.builtin.env', 'GIT_PUSH_TOKEN') }}"
+
+# ------------------------------------------------------------------ Argo CD
+# false: the learners install Argo CD themselves (PRACTICE-TASK.md, Part 6).
+install_argocd: false

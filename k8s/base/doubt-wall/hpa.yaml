@@ -1,0 +1,23 @@
+# Scale 2-5 pods on CPU. k3s ships metrics-server, which the HPA needs.
+# 5 pods x DB_POOL_MAX 10 = 50 connections, under PostgreSQL's default 100.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: doubt-wall
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: doubt-wall
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120   # scale down after 2 calm minutes (demo-friendly)

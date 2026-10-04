@@ -1,0 +1,20 @@
+---
+jenkins_configure_as_code: true
+jenkins_plugin_manager_version: "2.15.0"
+jenkins_plugin_manager_url: >-
+  {{ jenkins_plugin_manager_base }}/{{ jenkins_plugin_manager_version }}/jenkins-plugin-manager-{{ jenkins_plugin_manager_version }}.jar
+jenkins_plugin_manager_base: https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download
+jenkins_home: /var/lib/jenkins
+jenkins_casc_secrets_dir: "{{ jenkins_home }}/casc-secrets"
+# Plugins the Jenkinsfile needs, plus Configuration as Code and Job DSL.
+# The plugin manager pulls in each plugin's dependencies automatically.
+jenkins_plugins:
+  - configuration-as-code
+  - job-dsl
+  - workflow-aggregator
+  - git
+  - credentials-binding
+  - plain-credentials
+  - junit
+  - timestamper
+  - pipeline-stage-view

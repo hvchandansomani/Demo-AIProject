@@ -1,0 +1,33 @@
+# Normal Service: load-balances learner traffic across ready pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: doubt-wall
+  labels:
+    app: doubt-wall
+spec:
+  selector:
+    app: doubt-wall
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Headless Service listing EVERY pod, including not-ready ones. AIOps Triage
+# uses it to send each chaos switch to all replicas, and to reach pods whose
+# readiness it switched off (otherwise "Stop all chaos" couldn't reach them).
+apiVersion: v1
+kind: Service
+metadata:
+  name: doubt-wall-pods
+  labels:
+    app: doubt-wall
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: doubt-wall
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

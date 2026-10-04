@@ -1,0 +1,27 @@
+# One public entry point (Traefik, bundled with k3s):
+#   http://<node-ip>/      -> Doubt Wall   (learners)
+#   http://<node-ip>/ops   -> AIOps Triage (instructor; sign-in required)
+# AIOps Triage handles the /ops prefix itself (URL_PREFIX), so no rewrite.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: marathon
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /ops
+            pathType: Prefix
+            backend:
+              service:
+                name: aiops-triage
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: doubt-wall
+                port:
+                  name: http

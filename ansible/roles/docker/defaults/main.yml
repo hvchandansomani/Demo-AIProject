@@ -1,0 +1,4 @@
+---
+# Images older than this are removed every night, so build images can't
+# slowly fill the Jenkins disk.
+docker_prune_older_than: 72h

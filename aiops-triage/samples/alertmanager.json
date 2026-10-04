@@ -1,0 +1,22 @@
+{
+  "version": "4",
+  "status": "firing",
+  "receiver": "aiops-triage",
+  "groupLabels": { "alertname": "HighErrorRate" },
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighErrorRate",
+        "severity": "critical",
+        "namespace": "aiops",
+        "service": "aiops-triage"
+      },
+      "annotations": {
+        "summary": "5xx error rate above 5% for 2 minutes",
+        "description": "23% of requests to /api/work returned 500 in the last 5 minutes."
+      },
+      "startsAt": "2026-10-04T10:15:00Z"
+    }
+  ]
+}

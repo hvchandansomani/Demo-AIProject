@@ -1,0 +1,64 @@
+# Runs the whole marathon stack on one machine:
+#   Doubt Wall    http://localhost:8000      (what learners use)
+#   AIOps Triage  http://localhost:8080/ops  (instructor console)
+#   PostgreSQL    internal only
+#
+#   cp .env.example .env    # then edit the tokens
+#   docker compose up --build
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: doubtwall
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: doubtwall
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/18/docker,
+      # so the volume is mounted one level up (not .../data as in 17 and older).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doubtwall -d doubtwall"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  doubt-wall:
+    build:
+      context: ./doubt-wall
+      args: { APP_VERSION: "${APP_VERSION:-1.0.0}" }
+    image: doubt-wall:local
+    ports: ["8000:8000"]
+    environment:
+      DB_HOST: postgres
+      DB_USER: doubtwall
+      DB_NAME: doubtwall
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in .env}
+      SESSION_TITLE: ${SESSION_TITLE:-DevOps Marathon}
+      BANNER_TEXT: ${BANNER_TEXT:-Welcome to the DevOps marathon. Ask anything.}
+      BANNER_COLOR: "${BANNER_COLOR:-#1F4E79}"
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
+  aiops-triage:
+    build:
+      context: ./aiops-triage
+      args: { APP_VERSION: "${APP_VERSION:-1.0.0}" }
+    image: aiops-triage:local
+    ports: ["8080:8000"]
+    environment:
+      URL_PREFIX: /ops
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:-}
+      LLM_MODE: ${LLM_MODE:-mock}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5}
+      CHAOS_TARGET_URL: http://doubt-wall:8000
+      CHAOS_TARGET_NAME: Doubt Wall
+    depends_on: [doubt-wall]
+    restart: unless-stopped
+
+volumes:
+  pgdata:

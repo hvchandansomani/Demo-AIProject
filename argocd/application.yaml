@@ -1,0 +1,38 @@
+# Tells Argo CD: "keep the marathon namespace in sync with k8s/overlays/gitops
+# in this Git repository". Apply once:
+#   kubectl apply -f argocd/application.yaml
+#
+# Before applying, set repoURL to YOUR fork (and targetRevision to your branch).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: marathon
+  namespace: argocd
+  # Deleting this Application also deletes the app's Kubernetes resources.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR-GITHUB-USER/Demo-B17.git
+    targetRevision: main
+    path: k8s/overlays/gitops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: marathon
+  syncPolicy:
+    automated:
+      prune: true      # resources removed from git are removed from the cluster
+      selfHeal: true   # manual kubectl changes are reverted to what git says
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+# Secrets are not in git: marathon-secrets comes from k8s/create-secrets.sh and
+# ecr-pull from the refresh timer on the k3s node. Argo CD only manages what it
+# created from git, so it leaves both alone. (Next step in a real project:
+# Sealed Secrets or External Secrets Operator, so secrets can live in git safely.)

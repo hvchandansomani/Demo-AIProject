@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aiops-triage
+  labels:
+    app: aiops-triage
+spec:
+  selector:
+    app: aiops-triage
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

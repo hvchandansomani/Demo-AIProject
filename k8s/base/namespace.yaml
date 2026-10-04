@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: marathon
+  labels:
+    # Pod Security Admission. "baseline" is enforced because the official
+    # PostgreSQL image starts as root before dropping to the postgres user.
+    # Both apps also meet "restricted"; warnings show if that ever changes.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

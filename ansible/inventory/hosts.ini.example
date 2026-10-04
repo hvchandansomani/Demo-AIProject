@@ -1,0 +1,17 @@
+# Example only. Terraform writes the real inventory/hosts.ini for you
+# (terraform/infra/inventory.tf), with your servers' IPs filled in.
+
+[jenkins]
+jenkins-1 ansible_host=203.0.113.20 private_ip=10.20.1.10
+
+[k3s]
+k3s-1 ansible_host=203.0.113.30 private_ip=10.20.1.20
+
+[all:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/marathon
+aws_region=ap-south-1
+ecr_registry=123456789012.dkr.ecr.ap-south-1.amazonaws.com
+jenkins_public_ip=203.0.113.20
+k3s_public_ip=203.0.113.30
+k3s_private_ip=10.20.1.20

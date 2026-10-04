@@ -1,0 +1,111 @@
+# One replica on purpose: incidents are kept in memory (see the README's
+# "teaching point"). A second replica would show a different incident list.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-triage
+  labels:
+    app: aiops-triage
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: aiops-triage
+  template:
+    metadata:
+      labels:
+        app: aiops-triage
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: aiops-triage
+      automountServiceAccountToken: true   # needed to read pod logs (see rbac.yaml)
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: aiops-triage
+          image: aiops-triage        # set by the overlay (kustomize images)
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: aiops-triage-config
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: admin-token
+            - name: WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: webhook-token
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: secret-key
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: anthropic-api-key
+                  optional: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,28 @@
+# AIOps Triage can READ pods, pod logs and events in this namespace only,
+# so it can add recent logs to an alert before diagnosing it.
+# It cannot change, delete or exec into anything.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aiops-triage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aiops-triage-read
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aiops-triage-read
+subjects:
+  - kind: ServiceAccount
+    name: aiops-triage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aiops-triage-read

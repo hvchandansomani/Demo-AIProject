@@ -1,0 +1,91 @@
+# One PostgreSQL pod with its data on a PersistentVolume (k3s: local-path).
+# Deleting the pod keeps the data; deleting the PVC deletes it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:18-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: doubtwall
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: postgres-password
+            - name: APP_DB_USER
+              value: doubtwall
+            - name: APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: marathon-secrets
+                  key: db-password
+          volumeMounts:
+            # PostgreSQL 18 images keep data in /var/lib/postgresql/18/docker,
+            # so the volume is mounted at the parent directory.
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "doubtwall"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "doubtwall"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            # The image starts as root only to fix file ownership, then drops
+            # to the postgres user; it never needs to gain privileges.
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

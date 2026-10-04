@@ -1,0 +1,14 @@
+# k3s server settings, written by Ansible (roles/k3s).
+node-name: {{ inventory_hostname }}
+
+# Only root can read the admin kubeconfig on the server.
+write-kubeconfig-mode: "0600"
+
+# Extra names in the API server's TLS certificate, so kubectl works through
+# the public IP (your laptop) and the private IP (Jenkins).
+tls-san:
+  - {{ k3s_public_ip }}
+  - {{ private_ip }}
+
+# Encrypt Kubernetes Secrets at rest in the k3s datastore.
+secrets-encryption: true

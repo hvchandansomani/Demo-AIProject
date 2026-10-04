@@ -1,0 +1,9 @@
+# Keep Linux line endings for files that run on the Linux servers, even when
+# the repo is checked out on Windows. CRLF line endings break bash scripts
+# ("$'\r': command not found") and can confuse YAML and the Jenkinsfile.
+*.sh        text eol=lf
+Jenkinsfile text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+Dockerfile  text eol=lf
+*.py        text eol=lf

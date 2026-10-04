@@ -1,0 +1,30 @@
+---
+# Optional: installs Argo CD for the instructor. Learners do these steps by
+# hand in PRACTICE-TASK.md, Part 6.
+- name: Create the argocd namespace
+  ansible.builtin.shell: |
+    set -o pipefail
+    k3s kubectl create namespace argocd --dry-run=client -o yaml | k3s kubectl apply -f -
+  args:
+    executable: /bin/bash
+  register: argocd_ns
+  changed_when: "'created' in argocd_ns.stdout"
+
+- name: Install Argo CD {{ argocd_version }}
+  # --server-side: some Argo CD CRDs are too large for client-side apply.
+  ansible.builtin.command: >-
+    k3s kubectl apply -n argocd --server-side --force-conflicts
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml
+  register: argocd_install
+  changed_when: "'serverside-applied' in argocd_install.stdout and 'unchanged' not in argocd_install.stdout"
+
+- name: Wait for the Argo CD server
+  ansible.builtin.command: k3s kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
+  changed_when: false
+
+- name: Show how to open Argo CD
+  ansible.builtin.debug:
+    msg:
+      - "Argo CD {{ argocd_version }} is installed."
+      - "Password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+      - "UI: kubectl -n argocd port-forward svc/argocd-server 8443:443, then https://localhost:8443 (user: admin)"

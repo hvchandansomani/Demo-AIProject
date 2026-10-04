@@ -1,0 +1,19 @@
+# Only Doubt Wall pods may open a connection to PostgreSQL.
+# (kubectl exec for psql demos is not network traffic, so it still works.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-doubt-wall
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: doubt-wall
+      ports:
+        - protocol: TCP
+          port: 5432

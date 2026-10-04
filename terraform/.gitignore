@@ -1,0 +1,13 @@
+# Terraform working files and state (state lives in S3 for ./infra)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfplan
+
+# Your own values: account IDs, IPs, emails
+terraform.tfvars
+backend.hcl
+
+# The bootstrap stack keeps its state locally on purpose. Keep it safe, but
+# don't commit it. (It holds no secrets, only the bucket's details.)

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doubt Wall | {{ cfg.SESSION_TITLE }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231F4E79'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'>?</text></svg>">
+  <style>:root { --brand: {{ cfg.BANNER_COLOR }}; }</style>
+</head>
+<body>
+  <header class="band">
+    <div class="band-inner">
+      <p class="band-kicker">Doubt Wall</p>
+      <h1 class="band-title">{{ cfg.SESSION_TITLE }}</h1>
+      <p class="band-text" id="banner-text">{{ cfg.BANNER_TEXT }}</p>
+    </div>
+    <span class="band-version" title="Build running on the pod that served you">v{{ cfg.APP_VERSION }}</span>
+  </header>
+
+  <div class="admin-bar" id="admin-bar" hidden>
+    <form id="admin-form" class="admin-form">
+      <label for="admin-token">Admin token</label>
+      <input id="admin-token" type="password" autocomplete="off" placeholder="Paste the admin token">
+      <button class="btn btn-dark" type="submit">Unlock moderation</button>
+      <button class="btn btn-quiet" type="button" id="admin-cancel">Cancel</button>
+    </form>
+    <div class="admin-on" id="admin-on" hidden>
+      <span>Moderation is on. You can mark doubts answered or remove them.</span>
+      <button class="btn btn-quiet" type="button" id="admin-off">Turn off</button>
+    </div>
+  </div>
+
+  <main class="page">
+    <section class="composer" aria-labelledby="ask-h">
+      <h2 id="ask-h">Ask a doubt</h2>
+      <form id="ask-form" novalidate>
+        <label for="nickname">Your name</label>
+        <input id="nickname" maxlength="{{ cfg.MAX_NICKNAME }}" autocomplete="nickname" placeholder="e.g. Priya">
+        <label for="question">Your doubt</label>
+        <textarea id="question" rows="5" maxlength="{{ cfg.MAX_QUESTION }}"
+          placeholder="What's confusing you? e.g. Why does my pod show CrashLoopBackOff?"></textarea>
+        <div class="count-row">
+          <span class="form-error" id="ask-error" role="alert"></span>
+          <span class="char-count" id="char-count">0 / {{ cfg.MAX_QUESTION }}</span>
+        </div>
+        <button class="btn btn-brand" type="submit" id="ask-btn">Post doubt</button>
+      </form>
+      <p class="composer-note">Everyone in the session sees your doubt. Upvote the ones you also want answered.</p>
+    </section>
+
+    <section class="wall" aria-labelledby="wall-h">
+      <div class="wall-head">
+        <div>
+          <h2 id="wall-h">Doubts</h2>
+          <p class="wall-stats" id="wall-stats">Loading…</p>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Sort doubts">
+          <button role="tab" class="tab is-on" aria-selected="true" data-sort="top">Most upvoted</button>
+          <button role="tab" class="tab" aria-selected="false" data-sort="new">Newest</button>
+        </div>
+      </div>
+      <p class="conn" id="conn" hidden role="status"></p>
+      <ol class="doubts" id="doubts" aria-live="polite"></ol>
+      <div class="empty" id="empty" hidden>
+        <p class="empty-title">The wall is empty</p>
+        <p>Be the first to ask. Chances are someone else has the same doubt.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Version <strong id="f-version">{{ cfg.APP_VERSION }}</strong></span>
+    <span>Served by <code id="f-instance">{{ cfg.INSTANCE }}</code></span>
+    <button class="linkish" type="button" id="admin-open">Moderate</button>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

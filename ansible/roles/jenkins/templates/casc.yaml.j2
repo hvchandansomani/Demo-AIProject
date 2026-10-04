@@ -1,0 +1,68 @@
+# Jenkins Configuration as Code, written by Ansible (roles/jenkins).
+# Jenkins reads this at every start. Edit the template and re-run Ansible
+# instead of clicking in the UI, so the setup is repeatable.
+#
+# Secrets are NOT in this file: ${readFile:...} and ${readFileBase64:...}
+# read them at start-up from {{ jenkins_casc_secrets_dir }} (readable by jenkins only).
+
+jenkins:
+  systemMessage: "DevOps Marathon CI/CD. Configured by Ansible and Configuration as Code: change the code, not the UI."
+  numExecutors: 2
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "{{ jenkins_admin_user }}"
+          password: "${readFile:{{ jenkins_casc_secrets_dir }}/admin-password}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: ECR_REGISTRY
+            value: "{{ ecr_registry }}"
+          - key: AWS_REGION
+            value: "{{ aws_region }}"
+
+unclassified:
+  location:
+    url: "http://{{ jenkins_public_ip }}:8080/"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - file:
+              scope: GLOBAL
+              id: k3s-kubeconfig
+              description: "k3s kubeconfig (private IP), written by Ansible"
+              fileName: kubeconfig
+              secretBytes: "${readFileBase64:{{ jenkins_casc_secrets_dir }}/k3s-kubeconfig}"
+{% if git_push_user and git_push_token %}
+          - usernamePassword:
+              scope: GLOBAL
+              id: git-push
+              description: "GitHub token used by the GitOps stage to push image tags"
+              username: "{{ git_push_user }}"
+              password: "${readFile:{{ jenkins_casc_secrets_dir }}/git-push-token}"
+{% endif %}
+
+jobs:
+  - script: |
+      pipelineJob('marathon') {
+        description('Tests, builds, scans and deploys the Doubt Wall and AIOps Triage. See JENKINS.md.')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('{{ app_repo_url }}') }
+                branches('*/{{ app_repo_branch }}')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }

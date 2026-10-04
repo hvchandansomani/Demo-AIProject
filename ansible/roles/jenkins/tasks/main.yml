@@ -1,0 +1,166 @@
+---
+- name: Check the admin password was provided
+  ansible.builtin.assert:
+    that:
+      - jenkins_admin_password | length >= 12
+    fail_msg: >-
+      Set a Jenkins admin password of at least 12 characters before running:
+      export JENKINS_ADMIN_PASSWORD='...'
+    quiet: true
+  when: jenkins_configure_as_code | bool
+  no_log: true
+
+- name: Warn if the repository URL is still the placeholder
+  ansible.builtin.debug:
+    msg: "app_repo_url is still the example value. Set it to your fork in group_vars/all.yml, or the pipeline job won't find the code."
+  when: "'YOUR-GITHUB-USER' in app_repo_url"
+
+# ------------------------------------------------------------ install
+- name: Install Java 21 (Jenkins requires Java 21+)
+  ansible.builtin.apt:
+    name:
+      - fontconfig
+      - openjdk-21-jre-headless
+    state: present
+
+- name: Add the Jenkins package signing key (the 2026 key; older tutorials use a retired one)
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+    dest: /etc/apt/keyrings/jenkins-keyring.asc
+    mode: "0644"
+
+- name: Add the Jenkins LTS repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+    filename: jenkins
+    state: present
+
+- name: Install Jenkins LTS
+  ansible.builtin.apt:
+    name: jenkins
+    state: present
+    update_cache: true
+
+- name: Let the jenkins user run Docker (build, scan and test stages)
+  ansible.builtin.user:
+    name: jenkins
+    groups: docker
+    append: true
+  notify: Restart jenkins
+
+- name: Create the systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/jenkins.service.d
+    state: directory
+    mode: "0755"
+
+- name: Write the Jenkins service override
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/jenkins.service.d/override.conf
+    mode: "0644"
+  notify: Restart jenkins
+
+# ------------------------------------------------------------ configuration as code
+- name: Configuration as Code
+  when: jenkins_configure_as_code | bool
+  block:
+    - name: Download the Jenkins plugin manager {{ jenkins_plugin_manager_version }}
+      ansible.builtin.get_url:
+        url: "{{ jenkins_plugin_manager_url }}"
+        dest: /opt/jenkins-plugin-manager.jar
+        mode: "0644"
+
+    - name: Install plugins and their dependencies
+      # Each plugin must be its own argument after --plugins.
+      ansible.builtin.command:
+        argv: "{{ ['java', '-jar', '/opt/jenkins-plugin-manager.jar',
+                   '--war', '/usr/share/java/jenkins.war',
+                   '--plugin-download-directory', jenkins_home ~ '/plugins',
+                   '--plugins'] + jenkins_plugins }}"
+        creates: "{{ jenkins_home }}/plugins/configuration-as-code.jpi"
+      become: true
+      become_user: jenkins
+      notify: Restart jenkins
+
+    - name: Create the secrets folder (readable by jenkins only)
+      ansible.builtin.file:
+        path: "{{ jenkins_casc_secrets_dir }}"
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: "0700"
+
+    - name: Store the admin password
+      ansible.builtin.copy:
+        dest: "{{ jenkins_casc_secrets_dir }}/admin-password"
+        content: "{{ jenkins_admin_password }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0400"
+      no_log: true
+      notify: Restart jenkins
+
+    - name: Store the k3s kubeconfig (fetched by the k3s role)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/artifacts/kubeconfig-jenkins.yaml"
+        dest: "{{ jenkins_casc_secrets_dir }}/k3s-kubeconfig"
+        owner: jenkins
+        group: jenkins
+        mode: "0400"
+      no_log: true
+      notify: Restart jenkins
+
+    - name: Store the Git push token (GitOps path)
+      ansible.builtin.copy:
+        dest: "{{ jenkins_casc_secrets_dir }}/git-push-token"
+        content: "{{ git_push_token }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0400"
+      when: git_push_user | length > 0 and git_push_token | length > 0
+      no_log: true
+      notify: Restart jenkins
+
+    - name: Write the Configuration as Code file
+      ansible.builtin.template:
+        src: casc.yaml.j2
+        dest: "{{ jenkins_home }}/casc.yaml"
+        owner: jenkins
+        group: jenkins
+        mode: "0600"
+      notify: Restart jenkins
+
+# ------------------------------------------------------------ start and check
+- name: Apply pending restarts now
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Jenkins now and at boot
+  ansible.builtin.systemd_service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Wait for Jenkins to answer
+  ansible.builtin.uri:
+    url: http://localhost:8080/login
+    status_code: 200
+  register: jenkins_up
+  until: jenkins_up.status == 200
+  retries: 40
+  delay: 5
+
+- name: Read the setup-wizard password (only without Configuration as Code)
+  ansible.builtin.slurp:
+    src: "{{ jenkins_home }}/secrets/initialAdminPassword"
+  register: jenkins_initial_password
+  when: not (jenkins_configure_as_code | bool)
+
+- name: Show how to sign in
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Jenkins is ready at http://' ~ jenkins_public_ip ~ ':8080 . Sign in as '
+         ~ jenkins_admin_user ~ ' with JENKINS_ADMIN_PASSWORD. The pipeline job "marathon" is already created.'
+         if (jenkins_configure_as_code | bool) else
+         'Jenkins is at http://' ~ jenkins_public_ip ~ ':8080 . Setup-wizard password: '
+         ~ (jenkins_initial_password.content | b64decode | trim) }}

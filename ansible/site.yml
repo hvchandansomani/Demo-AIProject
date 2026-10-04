@@ -1,0 +1,48 @@
+---
+# Configures the servers Terraform created.
+#   ansible-playbook site.yml
+# Safe to run again: every task checks before it changes anything.
+
+- name: Wait for both servers to finish booting
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait until SSH answers
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Wait for cloud-init (first-boot setup) to finish, so apt isn't locked
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+- name: Base setup for every server
+  hosts: all
+  become: true
+  roles:
+    - common
+    - awscli
+
+# k3s goes first: Jenkins needs its kubeconfig.
+- name: Kubernetes (k3s) node
+  hosts: k3s
+  become: true
+  roles:
+    - k3s
+
+- name: Jenkins server
+  hosts: jenkins
+  become: true
+  roles:
+    - docker
+    - kubectl
+    - jenkins
+
+- name: Argo CD (optional, see install_argocd)
+  hosts: k3s
+  become: true
+  roles:
+    - role: argocd
+      when: install_argocd | bool

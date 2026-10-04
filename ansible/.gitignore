@@ -1,0 +1,4 @@
+# Written by Terraform, contains your server IPs
+inventory/hosts.ini
+# Kubeconfigs fetched from k3s: full admin access to the cluster
+artifacts/

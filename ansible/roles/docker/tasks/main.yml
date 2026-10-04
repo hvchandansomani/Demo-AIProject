@@ -1,0 +1,55 @@
+---
+- name: Install Docker (Ubuntu packages)
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-buildx
+    state: present
+
+- name: Limit container log size (a chatty container can't fill the disk)
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" }
+      }
+  notify: Restart docker
+
+- name: Start Docker now and at boot
+  ansible.builtin.systemd_service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Install the nightly image clean-up service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-prune.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Remove unused Docker images older than {{ docker_prune_older_than }}
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/docker system prune --all --force --filter until={{ docker_prune_older_than }}
+
+- name: Install the nightly image clean-up timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-prune.timer
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Nightly Docker clean-up
+      [Timer]
+      OnCalendar=*-*-* 03:00:00
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable the clean-up timer
+  ansible.builtin.systemd_service:
+    name: docker-prune.timer
+    state: started
+    enabled: true
+    daemon_reload: true

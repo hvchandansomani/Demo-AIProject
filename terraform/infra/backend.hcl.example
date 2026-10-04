@@ -1,0 +1,14 @@
+# Copy to backend.hcl and fill in the bucket name printed by ../bootstrap
+# (terraform -chdir=../bootstrap output -raw backend_hcl > backend.hcl).
+bucket       = "marathon-tfstate-123456789012-ap-south-1"
+key          = "marathon/infra/terraform.tfstate"
+region       = "ap-south-1"
+encrypt      = true
+
+# Terraform 1.11+: lock with a lock file stored in S3 (recommended).
+use_lockfile = true
+
+# Older method, deprecated since Terraform 1.11: lock with a DynamoDB table.
+# Needs create_dynamodb_lock_table = true in ../bootstrap. You can set both
+# while migrating; Terraform then takes both locks.
+# dynamodb_table = "marathon-tf-lock"

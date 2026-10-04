@@ -1,0 +1,10 @@
+# Keep at least one Doubt Wall pod during voluntary disruptions (node drain).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: doubt-wall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: doubt-wall

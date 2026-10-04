@@ -1,0 +1,19 @@
+---
+# kubectl from the official Kubernetes package repository (signed packages).
+- name: Add the Kubernetes package signing key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubectl_minor }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    mode: "0644"
+
+- name: Add the Kubernetes package repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ kubectl_minor }}/deb/ /"
+    filename: kubernetes
+    state: present
+
+- name: Install kubectl
+  ansible.builtin.apt:
+    name: kubectl
+    state: present
+    update_cache: true

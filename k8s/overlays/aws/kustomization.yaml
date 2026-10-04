@@ -1,0 +1,40 @@
+# AWS overlay, used by Jenkins. Images come from Amazon ECR.
+#
+# Jenkins replaces the two placeholders in its own workspace copy before
+# running `kubectl apply -k k8s/overlays/aws` (this file in git stays as is):
+#   REPLACE_ECR_REGISTRY -> e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+#   REPLACE_IMAGE_TAG    -> e.g. 42-a1b2c3d (build number + git commit)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+images:
+  - name: doubt-wall
+    newName: REPLACE_ECR_REGISTRY/doubt-wall
+    newTag: REPLACE_IMAGE_TAG
+  - name: aiops-triage
+    newName: REPLACE_ECR_REGISTRY/aiops-triage
+    newTag: REPLACE_IMAGE_TAG
+
+# Show the build tag in both apps' UI ("v42-a1b2c3d").
+configMapGenerator:
+  - name: doubt-wall-config
+    behavior: merge
+    literals:
+      - APP_VERSION=REPLACE_IMAGE_TAG
+  - name: aiops-triage-config
+    behavior: merge
+    literals:
+      - APP_VERSION=REPLACE_IMAGE_TAG
+
+# k3s nodes pull from the private ECR registry with this secret. Jenkins
+# refreshes it on every deploy, because ECR login tokens expire after 12 hours.
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ecr-pull

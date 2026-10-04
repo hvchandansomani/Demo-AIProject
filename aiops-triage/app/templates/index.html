@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIOps Triage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231B2433'/><path d='M6 17h5l3-8 4 14 3-6h5' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M6 17h5l3-8 4 14 3-6h5"/></svg>
+      <div>
+        <h1>AIOps Triage</h1>
+        <p class="brand-sub">Alerts in, diagnoses out</p>
+      </div>
+    </div>
+    <div class="env">
+      <span class="pill pill-mode" id="mode-pill" data-mode="{{ cfg.effective_mode }}">
+        {% if cfg.effective_mode == 'claude' %}Claude {{ cfg.CLAUDE_MODEL }}{% else %}Mock mode{% endif %}
+      </span>
+      <span class="pill" title="The pod or container that served this page">Served by <code id="instance">{{ cfg.INSTANCE }}</code></span>
+      <span class="pill">v{{ cfg.APP_VERSION }}</span>
+      <span class="health" id="health" data-state="ok"><span class="dot"></span><span id="health-text">Healthy</span></span>
+      {% if cfg.ADMIN_TOKEN %}
+      <form method="post" action="{{ url_for('main.logout') }}" class="logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if not cfg.ADMIN_TOKEN %}
+  <div class="banner">No <code>ADMIN_TOKEN</code> is set, so anyone who can reach this page can use it. Set one before sharing the address.</div>
+  {% endif %}
+  {% if cfg.LLM_MODE == 'claude' and cfg.effective_mode != 'claude' %}
+  <div class="banner">Claude mode was requested but <code>ANTHROPIC_API_KEY</code> is empty, so answers come from the built-in rules. Add the key as a Secret and restart the pod.</div>
+  {% endif %}
+
+  <main class="layout">
+    <aside class="side">
+      <section class="panel" aria-labelledby="report-h">
+        <h2 id="report-h">Report an incident</h2>
+        <p class="hint">Paste an alert, a <code>kubectl describe</code> excerpt or log lines. Alertmanager and CloudWatch send theirs automatically.</p>
+        <form id="report-form">
+          <label for="alert-text" class="sr-only">Alert or log text</label>
+          <textarea id="alert-text" rows="8" placeholder="e.g. Pod api-7d9c restarted 4 times, Reason: OOMKilled, Exit Code: 137" required></textarea>
+          <div class="samples" role="group" aria-label="Load a sample alert">
+            <span class="samples-label">Try a sample</span>
+            {% for s in samples %}
+            <button type="button" class="chip" data-sample="{{ loop.index0 }}">{{ s.label }}</button>
+            {% endfor %}
+          </div>
+          <button type="submit" class="btn btn-primary" id="analyze-btn">
+            <span class="btn-label">Diagnose</span>
+          </button>
+          <p class="form-error" id="form-error" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="panel chaos" id="chaos-panel" aria-labelledby="chaos-h">
+        <div class="panel-head">
+          <h2 id="chaos-h">Break things on purpose</h2>
+          <span class="chaos-state" id="chaos-state">All calm</span>
+        </div>
+        {% if cfg.CHAOS_ENABLED %}
+        <p class="hint">Acts on <strong id="chaos-target">{{ cfg.CHAOS_TARGET_NAME if cfg.CHAOS_TARGET_URL else 'this app' }}</strong>. Each switch trips an alert you'll see in Prometheus, Grafana or CloudWatch.</p>
+        <div class="chaos-grid">
+          <button class="btn btn-chaos" data-chaos="errors">Fail 30% of requests</button>
+          <button class="btn btn-chaos" data-chaos="latency">Slow every request by 1.5 s</button>
+          <button class="btn btn-chaos" data-chaos="cpu">Burn CPU for 2 min</button>
+          <button class="btn btn-chaos" data-chaos="notready">Fail readiness probe</button>
+        </div>
+        <button class="btn btn-ghost btn-block" data-chaos="traffic">Send 50 test requests</button>
+        <p class="traffic-result" id="traffic-result" aria-live="polite"></p>
+        <button class="btn btn-ghost btn-block" data-chaos="reset">Stop all chaos</button>
+        {% else %}
+        <p class="hint">Chaos switches are off for this deployment. Set <code>CHAOS_ENABLED=true</code> to use them.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel endpoints" aria-labelledby="ep-h">
+        <h2 id="ep-h">Endpoints</h2>
+        <dl>
+          <dt><code>GET /health</code></dt><dd>Liveness probe</dd>
+          <dt><code>GET /ready</code></dt><dd>Readiness probe</dd>
+          <dt><code>GET /metrics</code></dt><dd>Prometheus scrape target</dd>
+          <dt><code>POST {{ request.script_root }}/webhook/alertmanager</code></dt><dd>Alertmanager receiver</dd>
+          <dt><code>POST {{ request.script_root }}/webhook/cloudwatch</code></dt><dd>SNS subscription for CloudWatch alarms</dd>
+        </dl>
+      </section>
+    </aside>
+
+    <section class="main">
+      <div class="stats" id="stats" aria-label="Summary">
+        <div class="stat"><span class="stat-num" id="s-total">0</span><span class="stat-label">incidents</span></div>
+        <div class="stat stat-critical"><span class="stat-num" id="s-critical">0</span><span class="stat-label">critical</span></div>
+        <div class="stat stat-warning"><span class="stat-num" id="s-warning">0</span><span class="stat-label">warning</span></div>
+        <div class="stat"><span class="stat-num" id="s-latency">0 ms</span><span class="stat-label">avg diagnosis time</span></div>
+        <div class="stat"><span class="stat-num" id="s-tokens">0</span><span class="stat-label">tokens used</span></div>
+        <div class="stat"><span class="stat-num" id="s-cost">$0.00</span><span class="stat-label">est. AI spend</span></div>
+      </div>
+
+      <article class="diagnosis" id="diagnosis" data-severity="none" aria-live="polite">
+        <div class="diag-empty">
+          <h2>No incidents yet</h2>
+          <p>Pick a sample on the left and press Diagnose, or point Alertmanager at <code>/webhook/alertmanager</code>. The diagnosis appears here.</p>
+        </div>
+      </article>
+
+      <section class="timeline-wrap" aria-labelledby="list-h">
+        <div class="list-head">
+          <h2 id="list-h">Incident log</h2>
+          <div class="list-tools">
+            <div class="filters" role="group" aria-label="Filter by severity">
+              <button class="filter is-on" data-filter="all">All</button>
+              <button class="filter" data-filter="critical">Critical</button>
+              <button class="filter" data-filter="warning">Warning</button>
+              <button class="filter" data-filter="info">Info</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="clear-btn">Clear log</button>
+          </div>
+        </div>
+        <ol class="incidents" id="incidents"></ol>
+        <p class="list-empty" id="list-empty">Incidents from every source are listed here, newest first.</p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Incidents live in this pod's memory. With several replicas, each pod keeps its own list.
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>window.SAMPLES = {{ samples | tojson }}; window.BASE = {{ request.script_root | tojson }};</script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

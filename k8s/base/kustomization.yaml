@@ -1,0 +1,59 @@
+# Shared manifests for both apps and PostgreSQL. Don't apply this directly:
+# use an overlay, which sets the image names and tags.
+#   kubectl apply -k k8s/overlays/aws     (images from ECR, used by Jenkins)
+#   kubectl apply -k k8s/overlays/local   (images built locally)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: marathon
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: devops-marathon
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - postgres/networkpolicy.yaml
+  - doubt-wall/deployment.yaml
+  - doubt-wall/service.yaml
+  - doubt-wall/hpa.yaml
+  - doubt-wall/pdb.yaml
+  - aiops-triage/rbac.yaml
+  - aiops-triage/deployment.yaml
+  - aiops-triage/service.yaml
+  - ingress.yaml
+
+# Non-secret settings. Kustomize adds a content hash to each ConfigMap name,
+# so changing a value here rolls the pods that use it automatically.
+# Secrets are NOT here: create them with k8s/create-secrets.sh.
+configMapGenerator:
+  - name: doubt-wall-config
+    literals:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=doubtwall
+      - DB_USER=doubtwall
+      - DB_POOL_MAX=10
+      - SESSION_TITLE=DevOps Marathon
+      - BANNER_TEXT=Welcome to the DevOps marathon. Ask anything.
+      - BANNER_COLOR=#1F4E79
+      - CHAOS_ENABLED=true
+      - TRUST_PROXY=true
+      - APP_VERSION=dev
+  - name: aiops-triage-config
+    literals:
+      - URL_PREFIX=/ops
+      - LLM_MODE=mock
+      - CLAUDE_MODEL=claude-haiku-4-5
+      - MAX_TOKENS=700
+      - CHAOS_ENABLED=true
+      - CHAOS_TARGET_URL=http://doubt-wall
+      - CHAOS_TARGET_NAME=Doubt Wall
+      - CHAOS_TARGET_PODS=doubt-wall-pods:8000
+      - K8S_CONTEXT_ENABLED=true
+      - APP_VERSION=dev
+  - name: postgres-init
+    files:
+      - postgres/init-app-role.sh

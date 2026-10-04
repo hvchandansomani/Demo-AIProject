@@ -1,0 +1,29 @@
+# Local overlay: a cluster on your own machine (Docker Desktop Kubernetes,
+# k3d, kind or minikube) using images you built with docker compose.
+#
+#   docker compose build                          # builds doubt-wall:local, aiops-triage:local
+#   ./k8s/create-secrets.sh
+#   kubectl apply -k k8s/overlays/local
+#
+# kind/minikube don't share Docker's images; load them first
+# (kind load docker-image ..., minikube image load ...). See k8s/README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+images:
+  - name: doubt-wall
+    newTag: local
+  - name: aiops-triage
+    newTag: local
+
+configMapGenerator:
+  - name: doubt-wall-config
+    behavior: merge
+    literals:
+      - APP_VERSION=local
+  - name: aiops-triage-config
+    behavior: merge
+    literals:
+      - APP_VERSION=local

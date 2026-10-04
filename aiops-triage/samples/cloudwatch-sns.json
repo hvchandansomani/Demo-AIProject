@@ -1,0 +1,5 @@
+{
+  "Type": "Notification",
+  "Subject": "ALARM: \"k3s-node-cpu-high\" in Asia Pacific (Mumbai)",
+  "Message": "{\"AlarmName\":\"k3s-node-cpu-high\",\"AlarmDescription\":\"CPU on the k3s node above 80%\",\"NewStateValue\":\"ALARM\",\"NewStateReason\":\"Threshold Crossed: 1 datapoint [91.2] was greater than the threshold (80.0).\",\"Trigger\":{\"MetricName\":\"CPUUtilization\",\"Namespace\":\"AWS/EC2\"}}"
+}

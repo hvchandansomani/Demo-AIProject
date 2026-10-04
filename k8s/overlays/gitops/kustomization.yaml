@@ -1,0 +1,39 @@
+# GitOps overlay: Argo CD watches THIS file in git and deploys whatever it says.
+#
+# Nobody runs kubectl apply. To release a new version, the Jenkins GitOps stage
+# (ci/gitops-update.sh) changes the image registry and tags below, commits and
+# pushes; Argo CD sees the commit and rolls the cluster forward.
+# The placeholders are filled in by the first GitOps pipeline run.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+images:
+  - name: doubt-wall
+    newName: REPLACE_ECR_REGISTRY/doubt-wall
+    newTag: REPLACE_IMAGE_TAG
+  - name: aiops-triage
+    newName: REPLACE_ECR_REGISTRY/aiops-triage
+    newTag: REPLACE_IMAGE_TAG
+
+configMapGenerator:
+  - name: doubt-wall-config
+    behavior: merge
+    literals:
+      - APP_VERSION=REPLACE_IMAGE_TAG
+  - name: aiops-triage-config
+    behavior: merge
+    literals:
+      - APP_VERSION=REPLACE_IMAGE_TAG
+
+# The pull secret is kept fresh on the k3s node by a systemd timer
+# (ansible/roles/k3s), because in GitOps Jenkins never talks to the cluster.
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ecr-pull

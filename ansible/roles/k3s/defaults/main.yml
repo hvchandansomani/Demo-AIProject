@@ -1,0 +1,6 @@
+---
+k3s_version: v1.34.11+k3s1
+# Where the kubeconfigs are saved on YOUR machine (the Ansible controller).
+k3s_artifacts_dir: "{{ playbook_dir }}/artifacts"
+# The ECR pull secret is refreshed this often (ECR tokens last 12 hours).
+k3s_ecr_refresh_every: 6h

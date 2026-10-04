@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+Marathon-Delivery-Tracker.xlsx
+# CI outputs
+reports/
+.trivy-cache/
+POSTGRES-CHEATSHEET.md

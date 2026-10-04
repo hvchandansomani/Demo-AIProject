@@ -1,0 +1,27 @@
+---
+# AWS CLI v2 (the Ubuntu package is the old v1). Used for ECR logins; it
+# authenticates with the server's IAM role, so no keys are configured.
+- name: Check whether the AWS CLI is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/aws
+  register: awscli_binary
+
+- name: Install AWS CLI v2
+  when: not awscli_binary.stat.exists
+  block:
+    - name: Download and unpack the installer
+      ansible.builtin.unarchive:
+        src: "{{ awscli_zip_url }}"
+        dest: /tmp
+        remote_src: true
+        creates: /tmp/aws/install
+
+    - name: Run the installer
+      ansible.builtin.command: /tmp/aws/install
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Remove the installer files
+      ansible.builtin.file:
+        path: /tmp/aws
+        state: absent
